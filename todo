@@ -1,0 +1,17 @@
+PICKUPABLES.EXE
+  desktop shimejis for a
+      modern generation!
+
+desc:
+pickupables.exe is an application that puts little critters
+on your desktop that you can interact with
+
+planned features:
+- spawn critters and let them do their own thing
+- simple ai where they do dumb things on their own
+- reskinnable (theme color + custom gif sprites)
+  - selectable skins in a menu
+
+future:
+- downloadable skins
+
