@@ -50,6 +50,7 @@ void Pickupable::mouseMoveEvent(QMouseEvent * event)
 {
 	if(state == states::stateHeld){
 		this->move(event->globalPos() - held_pos);
+		velocity = (event->pos() - held_pos);
 	}
 }
 
@@ -57,7 +58,6 @@ void Pickupable::mouseReleaseEvent(QMouseEvent * event)
 {
 	if(event->button() == Qt::LeftButton){
 		state = states::stateIdle;
-		velocity = QPoint(0, 0);
 	}
 }
 
@@ -70,8 +70,16 @@ void Pickupable::timerEvent(QTimerEvent * event)
 
 		bool on_ground = (rect.bottom() >= screen_rect.bottom());
 
+		if((on_ground && velocity.y() > 0) ||
+		   (rect.top() <= screen_rect.top() && velocity.y() < 0))
+			velocity.setY((int)(velocity.y() / -bounce_factor));
+
+		if((rect.right() >= screen_rect.right() && velocity.x() > 0) ||
+		   (rect.left() <= screen_rect.left() && velocity.x() < 0))
+			velocity.setX((int)(velocity.x() / -bounce_factor));
+
 		if(!on_ground && velocity.y() < 24) velocity.setY(velocity.y() + 1);
-		else if(on_ground && velocity.y() >= 0) velocity.setY((int)(velocity.y() / -bounce_factor));
+		if(on_ground && velocity.x() != 0) velocity.setX(((int)velocity.x() / 2.0));
 
 		if(state == states::stateHeld) return;
 
