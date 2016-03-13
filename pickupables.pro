@@ -18,6 +18,11 @@ win32:CONFIG(debug, debug|release) {
 	CONFIG += console
 }
 
+unix:!macx {
+	QT += x11extras
+	LIBS += -lX11
+}
+
 HEADERS += 	$$files(src/*.h) $$files(src/karchive/*.h)
 SOURCES += 	$$files(src/*.cpp) $$files(src/karchive/*.cpp)
 

@@ -16,21 +16,28 @@
 #include <QLabel>
 #include <QVBoxLayout>
 
+#include "src/pickupableWindowList.h"
 #include "karchive/KZip"
+
+QList<windowInfo> window_list;
+
 
 Pickupable::Pickupable(const QString & c) :
 	QWidget(),
-	cur_state(stateIdle),
-	ditzy(0), jumpy(false),
-	bounce_factor(4),
 
+	velocity(0, 0), cur_direction(directionRight), cur_state(stateIdle), on_ground(false),
 	cur_sprite(nullptr),
-	sprite_mirrored(false)
+
+	held_pos(0, 0), ditzy(0), idle_timeout(10), jumpy(false),
+
+	bounce_factor(4), holdpos_time(0), idle_level(stateMax-1)
 {
 
 	logic_timer = this->startTimer(1000/60);
+	idle_timer = this->startTimer(1000/4);
+	windowlist_timer = this->startTimer(500);
 
-	this->setWindowFlags(Qt::FramelessWindowHint | Qt::WindowStaysOnTopHint | Qt::Tool);
+	this->setWindowFlags(Qt::FramelessWindowHint | Qt::WindowStaysOnTopHint | Qt::ToolTip);
 	this->setAttribute(Qt::WA_ShowWithoutActivating);
 	
 	QPalette palette = this->palette();
@@ -84,6 +91,9 @@ bool Pickupable::load(const QString & c)
 			if(info_obj.contains("jumpy") && info_obj.value("jumpy").isBool())
 				this->jumpy = info_obj.value("jumpy").toBool(false);
 
+			if(info_obj.contains("idle") && info_obj.value("idle").isDouble())
+				this->idle_level = info_obj.value("idle").toInt(stateMax-1);
+
 			if(info_obj.contains("seed") && info_obj.value("seed").isDouble()) {
 
 				std::mt19937 mt(info_obj.value("seed").toInt(0));
@@ -127,6 +137,7 @@ bool Pickupable::load(const QString & c)
 		}
 	}
 
+	this->setState(states::stateIdle);
 	this->setAttribute(Qt::WA_TranslucentBackground);
 	return true;
 }
@@ -154,6 +165,16 @@ void Pickupable::setState(states s)
 	if(sprites.contains(this->stateName())) {
 		cur_sprite = sprites[this->stateName()];
 	}
+}
+
+Pickupable::directions Pickupable::direction() const
+{
+	return cur_direction;
+}
+void Pickupable::setDirection(directions d)
+{
+	cur_direction = d;
+	this->update();
 }
 
 void Pickupable::mousePressEvent(QMouseEvent * event)
@@ -197,13 +218,15 @@ void Pickupable::paintEvent(QPaintEvent * event)
 		const QPixmap & pix = cur_sprite->currentPixmap();
 
 		QTransform trans = painter.transform();
-		if(sprite_mirrored){
+
+		if(this->direction() == directions::directionLeft){
 			trans.scale(-1, 1);
 			trans.translate(-this->width(), 0);
 		} else {
 			trans.scale(1, 1);
 			trans.translate(0, 0);
 		}
+
 		painter.setTransform(trans);
 
 		QPoint pix_point = QPoint(this->width()/2 - pix.width()/2, this->height() - pix.height());
@@ -213,12 +236,33 @@ void Pickupable::paintEvent(QPaintEvent * event)
 
 void Pickupable::timerEvent(QTimerEvent * event)
 {
+	if(event->timerId() == windowlist_timer){
+		window_list = PickupableWindowList::windowGeometryList();
+	}
+	if(event->timerId() == idle_timer){
+
+		if(this->state() == states::stateHeld) return;
+		this->idleStateUpdate();
+	}
 	if(event->timerId() == logic_timer){
 
-		QRect screen_rect = this->windowHandle()->screen()->virtualGeometry();
-		QRect rect = QRect(this->pos(), this->size());
+		const QRect rect = QRect(this->pos(), this->size());
+		const QRect col_rect = rect.adjusted(0, (rect.height()-20), 0, 0);
 
-		bool on_ground = (rect.bottom() >= screen_rect.bottom());
+		on_ground = 0;
+
+		foreach(const windowInfo win, window_list){
+			if(win.maximized) continue;
+
+			const QRect tb_rect = win.rect.adjusted(0, -60, 0, -(win.rect.height()-20));
+			if(col_rect.intersects(tb_rect)){
+				on_ground = 2;
+				break;
+			}
+		}
+		QRect screen_rect = this->windowHandle()->screen()->virtualGeometry();
+
+		if(!on_ground) on_ground = (int)(rect.bottom() >= screen_rect.bottom());
 
 		if((on_ground && velocity.y() > 0) ||
 		   (rect.top() <= screen_rect.top() && velocity.y() < 0))
@@ -227,6 +271,7 @@ void Pickupable::timerEvent(QTimerEvent * event)
 		if((rect.right() >= screen_rect.right() && velocity.x() > 0) ||
 		   (rect.left() <= screen_rect.left() && velocity.x() < 0))
 			velocity.setX((int)(velocity.x() / -bounce_factor));
+
 
 		if(!on_ground && velocity.y() < 24) velocity.setY(velocity.y() + 1);
 		if(on_ground && this->state() == states::stateIdle && velocity.x() != 0)
@@ -240,7 +285,9 @@ void Pickupable::timerEvent(QTimerEvent * event)
 		if(!velocity.isNull()){
 			this->move(this->pos() + velocity.toPoint());
 
-			sprite_mirrored = (velocity.x() < 0);
+			if(this->state() == states::stateMove){
+				this->setDirection((velocity.x() < 0) ? directionLeft : directionRight);
+			}
 
 			if(cur_sprite){
 				if(qAbs(velocity.x()) > 1){
@@ -258,20 +305,88 @@ void Pickupable::timerEvent(QTimerEvent * event)
 			if(ditzy > 0) ditzy -= 2;
 			if(ditzy <= 0) ditzy = 0;
 		}
+	}
+}
 
-		// some other ai stuff
-		if(ditzy == 0){
+void Pickupable::idleStateUpdate()
+{
+	switch(cur_idlestate){
+		case stateJumping:
+		{
+			if(!ditzy && velocity.y() == 0) {
+				velocity.setY(jumpy ? -18 : -4);
+				ditzy = 100;
+			}
+			break;
+		}
+		case stateChasingPointer:
+		{
 			QPoint cpos = QCursor::pos(),
 			       bpos = (this->pos() + QPoint(this->size().width()/2, this->size().height()/2));
 
-			if(qAbs(bpos.x() - cpos.x()) > 50){
+			if(qAbs(bpos.x() - cpos.x()) > 50 && !ditzy){
 				this->setState(states::stateMove);
 				velocity.setX((cpos.x() > bpos.x()) ? 2 : -2);
-				if(jumpy && velocity.y() == 0) velocity.setY(-15);
+				if(!ditzy && jumpy && velocity.y() == 0) velocity.setY(-15);
 			} else {
+				this->setDirection((bpos.x() > cpos.x()) ? directions::directionLeft : directions::directionRight);
 				this->setState(states::stateIdle);
-				if(ditzy <= holdpos_time) ditzy += holdpos_time;
 			}
+			break;
+		}
+		case stateWalkingAround:
+		{
+			int x = this->x() + this->width()/2,
+			    screen_left = this->windowHandle()->screen()->geometry().left() + 200,
+			    screen_right = this->windowHandle()->screen()->geometry().right() - 200;
+
+			this->setState(states::stateMove);
+			velocity.setX(this->direction() == directionLeft ? -2 : 2);
+			if(jumpy && velocity.y() == 0) velocity.setY(-10);
+
+			if((x < screen_left && this->direction() == directionLeft) || (x > screen_right && this->direction() == directionRight)){
+				this->setDirection((this->direction() == directionRight) ? directionLeft : directionRight);
+				this->setState(states::stateIdle);
+				velocity = QPointF(0, 0);
+				idle_timeout = 0;
+			}
+			break;
+		}
+
+		// fall-through
+		case stateSitting:
+		{
+			if(sprites.contains("sitting"))
+				cur_sprite = sprites["sitting"];
+		}
+		case stateSleeping:
+		{
+			if(sprites.contains("sleeping"))
+				cur_sprite = sprites["sleeping"];
+		}
+		case stateStill: break;
+		default: break;
+	}
+
+	if(idle_timeout > 0) idle_timeout--;
+	if(idle_timeout == 0 && this->state() == states::stateIdle){
+
+		std::mt19937 mt(this->pos().x() + this->pos().y() + QTime::currentTime().second());
+		cur_idlestate = static_cast<idleStates>(randint(0, idle_level)(mt));
+
+		switch(cur_idlestate){
+			case stateJumping:
+				{ idle_timeout = randint(4, 10)(mt); break; }
+			case stateSitting:
+			case stateStill:
+				{ idle_timeout = randint(20, 40)(mt); break; }
+			case stateChasingPointer:
+			case stateWalkingAround:
+			case stateSleeping:
+				{ idle_timeout = randint(60, 120)(mt); break; }
+
+			default:
+				idle_timeout = randint(20, 30)(mt);
 		}
 	}
 }
