@@ -30,5 +30,5 @@ PickupableApp::PickupableApp(int & argc, char **argv) :
 
 	this->startTimer(1000/60);
 
-	pickupables << new Pickupable("test");
+	pickupables << new Pickupable("test.zip");
 }

@@ -2,18 +2,21 @@
 #define PICKUPABLE_H
 
 #include <QWidget>
+#include <QMap>
 
 class QMovie;
 
 class Pickupable : public QWidget
 {
 Q_OBJECT
-	private:
+	public:
 	enum states {
-		stateIdle,
+		stateIdle = 0,
 		stateHeld,
-		stateMoving
-	} state;
+		stateMove
+	} cur_state;
+
+	private:
 	int ditzy;
 	bool jumpy;
 
@@ -24,10 +27,12 @@ Q_OBJECT
 	qreal bounce_factor;
 	qreal holdpos_time;
 
+	QMap<QString, QMovie*> sprites;
 	QMovie * cur_sprite;
 	bool sprite_mirrored;
 
 	protected:
+	void movieUpdate(const QRect & rect);
 	void paintEvent(QPaintEvent * event);
 	void timerEvent(QTimerEvent * event);
 	void mousePressEvent(QMouseEvent * event);
@@ -36,7 +41,12 @@ Q_OBJECT
 
 	public:
 	Pickupable(const QString & c);
-	void load(const QString & c);
+	void reset();
+	bool load(const QString & c);
+
+	states state() const;
+	const QString stateName() const;
+	void setState(states s);
 };
 
 #endif
