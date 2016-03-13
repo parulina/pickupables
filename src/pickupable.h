@@ -4,12 +4,14 @@
 #include <QWidget>
 #include <QMap>
 
+class PickupableChatter;
 class QMovie;
 
 class Pickupable : public QWidget
 {
 Q_OBJECT
 	private:
+	PickupableChatter * chatter;
 
 	// timer stuff
 	int windowlist_timer;
@@ -55,7 +57,9 @@ Q_OBJECT
 
 	protected:
 	void movieUpdate(const QRect & rect);
+
 	void paintEvent(QPaintEvent * event);
+	void moveEvent(QMoveEvent * event);
 	void timerEvent(QTimerEvent * event);
 	void mousePressEvent(QMouseEvent * event);
 	void mouseMoveEvent(QMouseEvent * event);

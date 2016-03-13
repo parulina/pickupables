@@ -13,10 +13,11 @@
 #include <QBuffer>
 #include <QDebug>
 
-#include <QLabel>
 #include <QVBoxLayout>
 
 #include "src/pickupableWindowList.h"
+#include "src/pickupableChatter.h"
+
 #include "karchive/KZip"
 
 QList<windowInfo> window_list;
@@ -32,6 +33,7 @@ Pickupable::Pickupable(const QString & c) :
 
 	bounce_factor(4), holdpos_time(0), idle_level(stateMax-1)
 {
+	chatter = new PickupableChatter;
 
 	logic_timer = this->startTimer(1000/60);
 	idle_timer = this->startTimer(1000/4);
@@ -39,11 +41,7 @@ Pickupable::Pickupable(const QString & c) :
 
 	this->setWindowFlags(Qt::FramelessWindowHint | Qt::WindowStaysOnTopHint | Qt::ToolTip);
 	this->setAttribute(Qt::WA_ShowWithoutActivating);
-	
-	QPalette palette = this->palette();
-		palette.setColor(this->backgroundRole(), Qt::gray);
-		palette.setColor(this->foregroundRole(), Qt::black);
-	this->setPalette(palette);
+	this->setAttribute(Qt::WA_TranslucentBackground);
 
 	this->resize(100, 100);
 	this->load(c);
@@ -79,11 +77,11 @@ bool Pickupable::load(const QString & c)
 		if(err.error == QJsonParseError::NoError || doc.isObject()){
 			const QJsonObject info_obj = doc.object();
 
-			if(info_obj.contains("size") && info_obj.value("size").isDouble()){
-				int size = info_obj.value("size").toInt(50);
-				this->resize(size, size);
-				qDebug() << "dimensions:" << size;
-			}
+			if(info_obj.contains("width") && info_obj.value("width").isDouble())
+				this->setFixedWidth(info_obj.value("width").toInt(50));
+
+			if(info_obj.contains("height") && info_obj.value("height").isDouble())
+				this->setFixedHeight(info_obj.value("height").toInt(50));
 
 			if(info_obj.contains("bounce") && info_obj.value("bounce").isDouble())
 				this->bounce_factor = info_obj.value("bounce").toDouble(2.0);
@@ -138,7 +136,6 @@ bool Pickupable::load(const QString & c)
 	}
 
 	this->setState(states::stateIdle);
-	this->setAttribute(Qt::WA_TranslucentBackground);
 	return true;
 }
 
@@ -186,6 +183,7 @@ void Pickupable::mousePressEvent(QMouseEvent * event)
 		this->setState(states::stateHeld);
 		held_pos = event->pos();
 		velocity = QPoint(0, 0);
+		chatter->chat("abababab");
 	}
 }
 
@@ -232,6 +230,11 @@ void Pickupable::paintEvent(QPaintEvent * event)
 		QPoint pix_point = QPoint(this->width()/2 - pix.width()/2, this->height() - pix.height());
 		painter.drawPixmap(QRect(pix_point, pix.size()), pix);
 	}
+}
+
+void Pickupable::moveEvent(QMoveEvent * event)
+{
+	chatter->move(this->x() + this->width(), this->y() - chatter->height());
 }
 
 void Pickupable::timerEvent(QTimerEvent * event)
