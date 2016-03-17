@@ -378,6 +378,15 @@ void Pickupable::idleStateUpdate()
 		cur_idlestate = static_cast<idleStates>(randint(0, idle_level)(mt));
 
 		switch(cur_idlestate){
+			case stateStill: { chatter->chat("i'm standing still now!"); break; }
+			case stateSitting: { chatter->chat("i'm sitting now!"); break; }
+			case stateSleeping: { chatter->chat("i'm sleeping long now!"); break; }
+			case stateWalkingAround: { chatter->chat("i'm walking around now!"); break; }
+			case stateJumping: { chatter->chat("i'm jumping now!"); break; }
+			case stateChasingPointer: { chatter->chat("i'm chasing your pointer now!"); break; }
+			default: break;
+		}
+		switch(cur_idlestate){
 			case stateJumping:
 				{ idle_timeout = randint(4, 10)(mt); break; }
 			case stateSitting:
