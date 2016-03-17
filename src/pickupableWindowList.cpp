@@ -2,15 +2,40 @@
 
 #include <QDebug>
 
-#ifdef Q_OS_UNIX
+#if defined(Q_OS_UNIX)
  #include <QX11Info>
  #include <X11/Xatom.h>
  #include <X11/Xlib.h>
+#elif defined(Q_OS_WIN)
+ #include <windows.h>
+BOOL CALLBACK windowListProc(HWND hwnd, LPARAM lParam)
+{
+	QList<windowInfo> * list = reinterpret_cast<QList<windowInfo>*>(lParam);
+
+	windowInfo info;
+	info.maximized = IsZoomed(hwnd);
+	info.minimized = IsIconic(hwnd);
+
+	RECT rect;
+	if(!GetWindowRect(hwnd, &rect)) return false;
+	info.rect = QRect(rect.left, rect.top,
+			(rect.right - rect.left),
+			(rect.bottom - rect.top));
+
+	*list << info;
+
+	return true;
+}
+
 #endif
 
 QList<windowInfo> PickupableWindowList::windowGeometryList()
 {
 	QList<windowInfo> window_list;
+
+#ifdef Q_OS_WIN
+		EnumWindows(&windowListProc, reinterpret_cast<LPARAM>(&window_list));
+#endif
 
 #ifdef Q_OS_UNIX
 		if(QX11Info::isPlatformX11()){

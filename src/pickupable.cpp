@@ -252,7 +252,7 @@ void Pickupable::timerEvent(QTimerEvent * event)
 		foreach(const windowInfo win, window_list){
 			if(win.maximized) continue;
 
-			const QRect tb_rect = win.rect.adjusted(0, -60, 0, -(win.rect.height()-20));
+			const QRect tb_rect = win.rect.adjusted(0, 0, 0, -(win.rect.height()-20));
 			if(col_rect.intersects(tb_rect)){
 				on_ground = 2;
 				break;

@@ -6,6 +6,7 @@
 
 struct windowInfo {
 	QRect rect;
+	bool minimized;
 	bool maximized;
 };
 
