@@ -17,6 +17,7 @@
 
 #include "src/pickupableWindowList.h"
 #include "src/pickupableChatter.h"
+#include "src/PSprite.h"
 
 #include "karchive/KZip"
 
@@ -115,23 +116,13 @@ bool Pickupable::load(const QString & c)
 
 		QIODevice * dev = file->createDevice();
 		if(dev){
-			QMovie * mov = sprites[basename] = new QMovie(dev, QByteArray(), this);
-			connect(mov, &QMovie::updated, this, &Pickupable::movieUpdate);
-			mov->setCacheMode(QMovie::CacheAll);
 
-			// preload all of the frames
-			mov->jumpToFrame(0);
-			do {
-				mov->jumpToNextFrame();
-			} while(mov->currentFrameNumber() != 0);
+			QImageReader ir(dev);
+			sprites[basename] = new PSprite(ir, this);
+			connect(sprites[basename], &PSprite::updated, this, static_cast<void(Pickupable::*)(void)>(&Pickupable::update));
 
-			// for some reason deleting the device prevent the movie from starting...
-			// so just put dev as child to the movie
-			// so it gets deleted when the movie gets deleted... is this safe?
-			dev->setParent(mov);
-			mov->start();
-
-			qDebug() << "Adding" << basename << sprites[basename] << mov->frameCount();
+			qDebug() << "Adding" << basename;
+			delete dev;
 		}
 	}
 
@@ -157,10 +148,19 @@ const QString Pickupable::stateName() const
 void Pickupable::setState(states s)
 {
 	cur_state = s;
-	cur_sprite = nullptr;
 
 	if(sprites.contains(this->stateName())) {
-		cur_sprite = sprites[this->stateName()];
+		PSprite * new_anim = sprites[this->stateName()];
+		bool diff_anim = (cur_sprite != new_anim);
+
+		if(cur_sprite && diff_anim) {
+			cur_sprite->setPaused(true);
+			cur_sprite = nullptr;
+		}
+		cur_sprite = new_anim;
+		if(diff_anim) {
+			cur_sprite->setPaused(false);
+		}
 	}
 }
 
@@ -201,11 +201,6 @@ void Pickupable::mouseReleaseEvent(QMouseEvent * event)
 		this->setState(states::stateIdle);
 		ditzy += 100;
 	}
-}
-
-void Pickupable::movieUpdate(const QRect & rect)
-{
-	this->update();
 }
 
 void Pickupable::paintEvent(QPaintEvent * event)
@@ -294,11 +289,9 @@ void Pickupable::timerEvent(QTimerEvent * event)
 
 			if(cur_sprite){
 				if(qAbs(velocity.x()) > 1){
-					cur_sprite->setSpeed(qFloor((qAbs(velocity.x()) / 1.0) * 100));
-					cur_sprite->setPaused(false);
+					//cur_sprite->setSpeed(qFloor((qAbs(velocity.x()) / 1.0) * 100));
 				} else {
 					cur_sprite->setSpeed(100);
-					cur_sprite->setPaused(true);
 				}
 			}
 

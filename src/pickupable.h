@@ -5,7 +5,7 @@
 #include <QMap>
 
 class PickupableChatter;
-class QMovie;
+class PSprite;
 
 class Pickupable : public QWidget
 {
@@ -41,8 +41,8 @@ Q_OBJECT
 	} cur_idlestate;
 	int on_ground;
 
-	QMap<QString, QMovie*> sprites;
-	QMovie * cur_sprite;
+	QMap<QString, PSprite*> sprites;
+	PSprite * cur_sprite;
 
 	// calc vars
 	QPoint held_pos;
@@ -56,8 +56,6 @@ Q_OBJECT
 	int idle_level;
 
 	protected:
-	void movieUpdate(const QRect & rect);
-
 	void paintEvent(QPaintEvent * event);
 	void moveEvent(QMoveEvent * event);
 	void timerEvent(QTimerEvent * event);
