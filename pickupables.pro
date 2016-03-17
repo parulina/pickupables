@@ -17,6 +17,7 @@ win32:CONFIG(release, debug|release) {
 win32:CONFIG(debug, debug|release) {
 	CONFIG += console
 }
+win32:RC_ICONS = 	icon.ico
 
 unix:!macx {
 	QT += x11extras
