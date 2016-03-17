@@ -176,7 +176,7 @@ void Pickupable::setDirection(directions d)
 
 void Pickupable::mousePressEvent(QMouseEvent * event)
 {
-	if(event->button() == Qt::RightButton){
+	if(event->button() == Qt::MiddleButton){
 		QApplication::quit();
 	}
 	if(event->button() == Qt::LeftButton){
